@@ -1,5 +1,5 @@
-const { MongoClient } = require('mongodb');
-const bcrypt = require('bcryptjs');
+import { MongoClient } from 'mongodb';
+import bcrypt from 'bcryptjs';
 
 const uri = process.env.MONGODB_URI;
 let cachedClient = null;
