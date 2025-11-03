@@ -2,13 +2,14 @@ import { MongoClient, ObjectId } from 'mongodb';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   
+  const { id } = req.query;
   let client;
   
   try {
@@ -24,10 +25,24 @@ export default async function handler(req, res) {
     await client.connect();
     const db = client.db('yatayat');
     
-    if (req.method === 'GET') {
-      const users = await db.collection('users').find({}, { projection: { password: 0 } }).toArray();
-      res.status(200).json(users);
-    } 
+    if (req.method === 'PUT') {
+      const updateData = req.body;
+      
+      // Remove any fields that shouldn't be updated
+      delete updateData._id;
+      delete updateData.createdAt;
+      
+      await db.collection('users').updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updateData }
+      );
+      
+      res.status(200).json({ message: 'User updated successfully' });
+    }
+    else if (req.method === 'DELETE') {
+      await db.collection('users').deleteOne({ _id: new ObjectId(id) });
+      res.status(200).json({ message: 'User deleted successfully' });
+    }
     else {
       res.status(405).json({ message: 'Method not allowed' });
     }

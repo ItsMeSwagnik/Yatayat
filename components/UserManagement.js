@@ -6,6 +6,8 @@ const UserManagement = () => {
   const [showAddUser, setShowAddUser] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [showEditUser, setShowEditUser] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('All');
   
@@ -91,6 +93,34 @@ const UserManagement = () => {
     setShowDeleteConfirm(true);
   };
   
+  const handleEditClick = (user) => {
+    setEditingUser(user);
+    setShowEditUser(true);
+  };
+  
+  const updateUser = async (id, userData) => {
+    try {
+      const response = await fetch(`${window.location.origin.includes('localhost') ? 'http://localhost:5000' : ''}/api/users/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      
+      if (response.ok) {
+        setUsers(prev => prev.map(user => 
+          user._id === id ? { ...user, ...userData } : user
+        ));
+        alert('User updated successfully!');
+        setShowEditUser(false);
+      } else {
+        alert('Failed to update user');
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      alert('Error updating user');
+    }
+  };
+  
   if (loading) {
     return (
       <div>
@@ -161,6 +191,7 @@ const UserManagement = () => {
                         {user.role === 'police' && user.status === 'Pending' ? 'Verify' : (user.status === 'Active' ? 'Deactivate' : 'Activate')}
                       </button>
                       <button 
+                        onClick={() => handleEditClick(user)}
                         style={{ 
                           ...styles.button, 
                           background: styles.primary, 
@@ -235,6 +266,52 @@ const UserManagement = () => {
             </button>
           </div>
         </div>
+      </Modal>
+      
+      {/* Edit User Modal */}
+      <Modal isOpen={showEditUser} onClose={() => setShowEditUser(false)} title="Edit User">
+        {editingUser && (
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const userData = {
+              fullName: formData.get('fullName'),
+              email: formData.get('email'),
+              role: formData.get('role')
+            };
+            if (formData.get('role') === 'citizen') {
+              userData.vehicleNumbers = formData.get('vehicleNumbers')?.split(',').map(v => v.trim()) || [];
+            }
+            updateUser(editingUser._id, userData);
+          }}>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Full Name</label>
+              <input name="fullName" type="text" defaultValue={editingUser.fullName} required style={styles.input} />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Email</label>
+              <input name="email" type="email" defaultValue={editingUser.email} required style={styles.input} />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Role</label>
+              <select name="role" defaultValue={editingUser.role} required style={styles.input}>
+                <option value="citizen">Citizen</option>
+                <option value="police">Police Officer</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            {editingUser.role === 'citizen' && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Vehicle Numbers</label>
+                <input name="vehicleNumbers" type="text" defaultValue={editingUser.vehicleNumbers?.join(', ')} style={styles.input} placeholder="e.g., MH12AB1234, MH14CD5678" />
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button type="submit" style={{ ...styles.button, flex: 1, background: styles.primary, color: 'white' }}>Update User</button>
+              <button type="button" onClick={() => setShowEditUser(false)} style={{ ...styles.button, flex: 1, background: styles.light, color: styles.text }}>Cancel</button>
+            </div>
+          </form>
+        )}
       </Modal>
       
       {/* Add User Modal */}

@@ -2,13 +2,19 @@ import { MongoClient, ObjectId } from 'mongodb';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'PUT, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   
+  if (req.method !== 'PUT') {
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
+  
+  const { id } = req.query;
+  const { status } = req.body;
   let client;
   
   try {
@@ -24,15 +30,14 @@ export default async function handler(req, res) {
     await client.connect();
     const db = client.db('yatayat');
     
-    if (req.method === 'GET') {
-      const users = await db.collection('users').find({}, { projection: { password: 0 } }).toArray();
-      res.status(200).json(users);
-    } 
-    else {
-      res.status(405).json({ message: 'Method not allowed' });
-    }
+    await db.collection('users').updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status } }
+    );
+    
+    res.status(200).json({ message: 'User status updated successfully' });
   } catch (error) {
-    console.error('Users API error:', error);
+    console.error('Status update error:', error);
     res.status(500).json({ message: 'Database connection failed: ' + error.message });
   } finally {
     if (client) {
