@@ -28,8 +28,12 @@ export default async function handler(req, res) {
     }
     
     client = new MongoClient(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+      ssl: true,
+      sslValidate: true,
+      retryWrites: true,
+      w: 'majority'
     });
     
     await client.connect();
