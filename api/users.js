@@ -1,19 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb';
 
-const uri = process.env.MONGODB_URI;
-let cachedClient = null;
-
-async function connectToDatabase() {
-  if (cachedClient) {
-    return cachedClient;
-  }
-  
-  const client = new MongoClient(uri);
-  await client.connect();
-  cachedClient = client;
-  return client;
-}
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, OPTIONS');
@@ -23,8 +9,19 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
   
+  let client;
+  
   try {
-    const client = await connectToDatabase();
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI not configured');
+    }
+    
+    client = new MongoClient(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000
+    });
+    
+    await client.connect();
     const db = client.db('yatayat');
     
     if (req.method === 'GET') {
@@ -53,6 +50,10 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('Users API error:', error);
-    res.status(500).json({ message: 'Internal server error: ' + error.message });
+    res.status(500).json({ message: 'Database connection failed: ' + error.message });
+  } finally {
+    if (client) {
+      await client.close();
+    }
   }
 }

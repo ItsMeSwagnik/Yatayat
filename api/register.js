@@ -1,20 +1,6 @@
 import { MongoClient } from 'mongodb';
 import bcrypt from 'bcryptjs';
 
-const uri = process.env.MONGODB_URI;
-let cachedClient = null;
-
-async function connectToDatabase() {
-  if (cachedClient) {
-    return cachedClient;
-  }
-  
-  const client = new MongoClient(uri);
-  await client.connect();
-  cachedClient = client;
-  return client;
-}
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -30,8 +16,23 @@ export default async function handler(req, res) {
 
   const { email, password, role, fullName, vehicleNumbers, officerId } = req.body;
   
+  if (!email || !password || !role || !fullName) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+  
+  let client;
+  
   try {
-    const client = await connectToDatabase();
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI not configured');
+    }
+    
+    client = new MongoClient(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000
+    });
+    
+    await client.connect();
     const db = client.db('yatayat');
     
     const existingUser = await db.collection('users').findOne({ email, role });
@@ -56,6 +57,10 @@ export default async function handler(req, res) {
     res.status(201).json({ message: 'User created successfully' });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ message: 'Internal server error: ' + error.message });
+    res.status(500).json({ message: 'Database connection failed: ' + error.message });
+  } finally {
+    if (client) {
+      await client.close();
+    }
   }
 }
