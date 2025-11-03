@@ -38,6 +38,16 @@ export default async function handler(req, res) {
     const user = await db.collection('users').findOne({ email, role });
 
     if (user && await bcrypt.compare(password, user.password)) {
+      // Check if police officer is verified
+      if (user.role === 'police' && user.status === 'Pending') {
+        return res.status(401).json({ message: 'Account pending admin verification' });
+      }
+      
+      // Check if user is active
+      if (user.status === 'Inactive') {
+        return res.status(401).json({ message: 'Account has been deactivated' });
+      }
+      
       const { password: _, _id, ...userWithoutPassword } = user;
       res.status(200).json({ 
         token: 'mock-jwt-token', 
