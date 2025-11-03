@@ -1,0 +1,19 @@
+{
+  "functions": {
+    "api/login.js": {
+      "maxDuration": 10
+    },
+    "api/register.js": {
+      "maxDuration": 10
+    },
+    "api/users.js": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

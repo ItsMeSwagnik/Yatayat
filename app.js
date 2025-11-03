@@ -1,12 +1,7 @@
-const { useState, useEffect, createContext, useContext, useMemo } = React;
+const { useState, useEffect, useRef, createContext, useContext, useMemo } = React;
 const { LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = window.Recharts || {};
 
 // ==================== MOCK DATA ====================
-const mockUsers = [
-  { username: "john_citizen", password: "demo123", role: "citizen", vehicleNumbers: ["MH12AB1234", "MH14CD5678"] },
-  { username: "officer_raj", password: "demo123", role: "police", officerId: "POL001" },
-  { username: "admin_system", password: "demo123", role: "admin" }
-];
 
 const mockViolations = [
   { challanId: "CH001", vehicleNumber: "MH12AB1234", violationType: "helmet", timestamp: "2025-11-01T14:30:00", location: "MG Road Junction", fineAmount: 1000, officerId: "POL001", status: "Pending" },
@@ -77,23 +72,46 @@ const AuthProvider = ({ children }) => {
     { id: 3, message: "System update completed successfully", type: "info", read: true }
   ]);
 
-  const login = (username, password, role) => {
-    console.log('Login attempt:', { username, role });
-    const foundUser = mockUsers.find(
-      u => u.username === username && u.password === password && u.role === role
-    );
-    
-    if (foundUser) {
-      console.log('Login successful:', foundUser.username);
-      setUser(foundUser);
-      return true;
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    if (storedUser && token) {
+      setUser(JSON.parse(storedUser));
     }
-    console.log('Login failed: Invalid credentials');
-    return false;
+  }, []);
+
+  const login = async (email, password, role) => {
+    console.log('Login attempt:', { email, role });
+    
+    try {
+      const response = await fetch(window.location.origin.includes('localhost') ? 'http://localhost:5000/api/login' : '/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, role })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log('Login successful:', data.user.email);
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setUser(data.user);
+        return { success: true };
+      } else {
+        console.log('Login failed:', data.message);
+        return { success: false, message: data.message };
+      }
+    } catch (error) {
+      console.log('Login error:', error);
+      return { success: false, message: 'Network error. Please try again.' };
+    }
   };
 
   const logout = () => {
     console.log('User logged out');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
   };
 
@@ -420,7 +438,7 @@ const Navbar = () => {
             }}
           >
             <span style={{ fontSize: '18px' }}>👤</span>
-            <span>{user?.username}</span>
+            <span>{user?.fullName || user?.email}</span>
           </button>
           
           {showProfile && (
@@ -436,7 +454,7 @@ const Navbar = () => {
               border: `1px solid ${styles.border}`
             }}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${styles.border}` }}>
-                <div style={{ fontWeight: '600', color: styles.text }}>{user?.username}</div>
+                <div style={{ fontWeight: '600', color: styles.text }}>{user?.fullName || user?.email}</div>
                 <div style={{ fontSize: '12px', color: styles.textSecondary, textTransform: 'capitalize' }}>
                   {user?.role}
                 </div>
@@ -466,33 +484,33 @@ const Navbar = () => {
 };
 
 // Sidebar Component
-const Sidebar = ({ role }) => {
+const Sidebar = ({ role, currentPage, onPageChange }) => {
   const { darkMode } = useAuth();
   const styles = getStyles(darkMode);
   
   const menuItems = {
     citizen: [
-      { path: '/citizen/dashboard', icon: '🏠', label: 'Dashboard' },
-      { path: '/citizen/challans', icon: '📋', label: 'My Challans' },
-      { path: '/citizen/lookup', icon: '🔍', label: 'Vehicle Lookup' },
-      { path: '/citizen/history', icon: '📊', label: 'Violation History' },
-      { path: '/help', icon: '❓', label: 'Help & Support' }
+      { path: 'dashboard', icon: '🏠', label: 'Dashboard' },
+      { path: 'challans', icon: '📋', label: 'My Challans' },
+      { path: 'lookup', icon: '🔍', label: 'Vehicle Lookup' },
+      { path: 'history', icon: '📊', label: 'Violation History' },
+      { path: 'help', icon: '❓', label: 'Help & Support' }
     ],
     police: [
-      { path: '/police/dashboard', icon: '🏠', label: 'Dashboard' },
-      { path: '/police/record', icon: '🎥', label: 'Record Violation' },
-      { path: '/police/detected', icon: '📸', label: 'Detected Violations' },
-      { path: '/police/update', icon: '✏️', label: 'Update Challan' },
-      { path: '/help', icon: '❓', label: 'Help & Support' }
+      { path: 'dashboard', icon: '🏠', label: 'Dashboard' },
+      { path: 'record', icon: '🎥', label: 'Record Violation' },
+      { path: 'detected', icon: '📸', label: 'Detected Violations' },
+      { path: 'update', icon: '✏️', label: 'Update Challan' },
+      { path: 'help', icon: '❓', label: 'Help & Support' }
     ],
     admin: [
-      { path: '/admin/dashboard', icon: '🏠', label: 'Dashboard' },
-      { path: '/admin/users', icon: '👥', label: 'User Management' },
-      { path: '/admin/violations', icon: '🚦', label: 'Violation Management' },
-      { path: '/admin/payments', icon: '💰', label: 'Payment Overview' },
-      { path: '/admin/analytics', icon: '📍', label: 'Location Analytics' },
-      { path: '/admin/settings', icon: '⚙️', label: 'System Settings' },
-      { path: '/help', icon: '❓', label: 'Help & Support' }
+      { path: 'dashboard', icon: '🏠', label: 'Dashboard' },
+      { path: 'users', icon: '👥', label: 'User Management' },
+      { path: 'violations', icon: '🚦', label: 'Violation Management' },
+      { path: 'payments', icon: '💰', label: 'Payment Overview' },
+      { path: 'analytics', icon: '📍', label: 'Location Analytics' },
+      { path: 'settings', icon: '⚙️', label: 'System Settings' },
+      { path: 'help', icon: '❓', label: 'Help & Support' }
     ]
   };
   
@@ -514,6 +532,7 @@ const Sidebar = ({ role }) => {
       {items.map(item => (
         <div
           key={item.path}
+          onClick={() => onPageChange(item.path)}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -521,9 +540,9 @@ const Sidebar = ({ role }) => {
             padding: '12px 24px',
             cursor: 'pointer',
             color: styles.text,
-            background: 'transparent',
-            borderLeft: '3px solid transparent',
-            fontWeight: '400',
+            background: currentPage === item.path ? styles.light : 'transparent',
+            borderLeft: currentPage === item.path ? `3px solid ${styles.primary}` : '3px solid transparent',
+            fontWeight: currentPage === item.path ? '600' : '400',
             transition: 'all 0.2s ease',
             borderTop: item.label === 'Help & Support' ? `1px solid ${styles.border}` : 'none',
             marginTop: item.label === 'Help & Support' ? '12px' : '0'
@@ -656,28 +675,29 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 // ==================== LOGIN PAGE ====================
 const LoginPage = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('citizen');
   const [error, setError] = useState('');
   const [vehicleNumbers, setVehicleNumbers] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const { login, darkMode, toggleDarkMode } = useAuth();
   const styles = getStyles(darkMode);
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted:', { isLogin, username, role });
+    console.log('Form submitted:', { isLogin, email, role });
     setError('');
     
     if (isLogin) {
-      const success = login(username, password, role);
-      if (success) {
+      const result = await login(email, password, role);
+      if (result.success) {
         console.log('Redirecting to dashboard');
         onLogin && onLogin();
       } else {
-        console.log('Setting error message');
-        setError('Invalid credentials. Please try again.');
+        console.log('Setting error message:', result.message);
+        setError(result.message || 'Invalid credentials. Please try again.');
       }
     } else {
       if (password !== confirmPassword) {
@@ -685,9 +705,32 @@ const LoginPage = ({ onLogin }) => {
         setError('Passwords do not match');
         return;
       }
-      console.log('Registration attempt');
-      setError('Registration successful! Please login.');
-      setIsLogin(true);
+      
+      try {
+        const response = await fetch(window.location.origin.includes('localhost') ? 'http://localhost:5000/api/register' : '/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            password,
+            role,
+            fullName,
+            vehicleNumbers: role === 'citizen' ? vehicleNumbers.split(',').map(v => v.trim()) : undefined,
+            officerId: role === 'police' ? `POL${Date.now().toString().slice(-3)}` : undefined
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          setError('Registration successful! Please login.');
+          setIsLogin(true);
+        } else {
+          setError(data.message);
+        }
+      } catch (error) {
+        setError('Registration failed. Please try again.');
+      }
     }
   };
   
@@ -763,17 +806,33 @@ const LoginPage = ({ onLogin }) => {
         </div>
         
         <form onSubmit={handleSubmit}>
+          {!isLogin && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500', fontSize: '14px' }}>
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                style={styles.input}
+                required
+                placeholder="Enter your full name"
+              />
+            </div>
+          )}
+          
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500', fontSize: '14px' }}>
-              Username
+              Email
             </label>
             <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               style={styles.input}
               required
-              placeholder="Enter username"
+              placeholder="Enter email address"
             />
           </div>
           
@@ -819,7 +878,7 @@ const LoginPage = ({ onLogin }) => {
             >
               <option value="citizen">Citizen</option>
               <option value="police">Traffic Police</option>
-              <option value="admin">Admin</option>
+              {isLogin && <option value="admin">Admin</option>}
             </select>
           </div>
           
@@ -835,6 +894,19 @@ const LoginPage = ({ onLogin }) => {
                 style={styles.input}
                 placeholder="e.g., MH12AB1234, MH14CD5678"
               />
+            </div>
+          )}
+          
+          {!isLogin && role === 'police' && (
+            <div style={{
+              padding: '12px',
+              background: '#FEF3C7',
+              color: '#92400E',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              fontSize: '14px'
+            }}>
+              ⚠️ Police accounts require admin verification before login access is granted.
             </div>
           )}
           
@@ -875,1009 +947,305 @@ const LoginPage = ({ onLogin }) => {
           )}
         </form>
         
-        <div style={{
-          marginTop: '24px',
-          padding: '16px',
-          background: styles.light,
-          borderRadius: '8px'
-        }}>
-          <div style={{ fontSize: '12px', color: styles.textSecondary, marginBottom: '8px', fontWeight: '600' }}>Demo Credentials:</div>
-          <div style={{ fontSize: '11px', color: styles.textSecondary, lineHeight: '1.6' }}>
-            <div>Citizen: john_citizen / demo123</div>
-            <div>Police: officer_raj / demo123</div>
-            <div>Admin: admin_system / demo123</div>
-          </div>
-        </div>
+
       </div>
     </div>
   );
 };
 
-// ==================== CITIZEN PAGES ====================
+// ==================== ADMIN PAGES ====================
 
-// Driving Tips Component
-const DrivingTips = () => {
+// User Management Component
+const UserManagement = () => {
   const { darkMode } = useAuth();
   const styles = getStyles(darkMode);
-  
-  const tips = [
-    { icon: '🪖', title: 'Always Wear Helmet', desc: 'Protect yourself and avoid fines' },
-    { icon: '🚦', title: 'Follow Traffic Signals', desc: 'Stop at red lights and follow rules' },
-    { icon: '👥', title: 'Avoid Triple Riding', desc: 'Maximum 2 people on two-wheelers' },
-    { icon: '⚡', title: 'Control Speed', desc: 'Stay within speed limits' },
-    { icon: '📱', title: 'No Phone While Driving', desc: 'Focus on the road ahead' },
-    { icon: '🚗', title: 'Proper Parking', desc: 'Park only in designated areas' }
-  ];
-  
-  return (
-    <div style={styles.card}>
-      <h3 style={{ color: styles.text, fontSize: '20px', fontWeight: '600', marginBottom: '20px' }}>🎯 Driving Tips</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
-        {tips.map((tip, index) => (
-          <div key={index} style={{
-            padding: '16px',
-            background: styles.light,
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <div style={{ fontSize: '24px' }}>{tip.icon}</div>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: styles.text }}>{tip.title}</div>
-              <div style={{ fontSize: '12px', color: styles.textSecondary, marginTop: '4px' }}>{tip.desc}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const CitizenDashboard = () => {
-  const { user, darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  const [selectedChallan, setSelectedChallan] = useState(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  
-  const userChallans = mockViolations.filter(v => 
-    user?.vehicleNumbers?.includes(v.vehicleNumber)
-  );
-  
-  const pendingFines = userChallans.filter(c => c.status === 'Pending').reduce((sum, c) => sum + c.fineAmount, 0);
-  const paidFines = userChallans.filter(c => c.status === 'Paid').reduce((sum, c) => sum + c.fineAmount, 0);
-  const recentChallans = userChallans.slice(0, 5);
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>
-        Welcome, {user?.username}!
-      </h2>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-        <StatCard title="Total Vehicles" value={user?.vehicleNumbers?.length || 0} icon="🚗" color="#2563EB" />
-        <StatCard title="Pending Fines" value={`₹${pendingFines}`} icon="⚠️" color="#F59E0B" />
-        <StatCard title="Total Fines Paid" value={`₹${paidFines}`} icon="✓" color="#10B981" />
-        <StatCard title="Total Challans" value={userChallans.length} icon="📋" color="#8B5CF6" />
-      </div>
-      
-      <div style={styles.card}>
-        <h3 style={{ color: styles.text, fontSize: '20px', fontWeight: '600', marginBottom: '20px' }}>Recent Challans</h3>
-        
-        {recentChallans.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: styles.textSecondary }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
-            <div style={{ fontSize: '18px', fontWeight: '500' }}>No Challans Found</div>
-            <div style={{ fontSize: '14px', marginTop: '8px' }}>You have a clean driving record!</div>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Challan ID</th>
-                  <th style={styles.th}>Violation Type</th>
-                  <th style={styles.th}>Date &amp; Time</th>
-                  <th style={styles.th}>Location</th>
-                  <th style={styles.th}>Amount</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentChallans.map(challan => (
-                  <tr key={challan.challanId} style={{ cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.background = styles.light} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                    <td style={styles.td}>{challan.challanId}</td>
-                    <td style={styles.td}>
-                      <span style={{ textTransform: 'capitalize' }}>{challan.violationType.replace('_', ' ')}</span>
-                    </td>
-                    <td style={styles.td}>{new Date(challan.timestamp).toLocaleString()}</td>
-                    <td style={styles.td}>{challan.location}</td>
-                    <td style={styles.td}>₹{challan.fineAmount}</td>
-                    <td style={styles.td}><StatusBadge status={challan.status} /></td>
-                    <td style={styles.td}>
-                      <button
-                        onClick={() => setSelectedChallan(challan)}
-                        style={{
-                          ...styles.button,
-                          background: styles.primary,
-                          color: 'white',
-                          padding: '6px 12px',
-                          fontSize: '12px'
-                        }}
-                      >
-                        View Details
-                      </button>
-                      {challan.status === 'Pending' && (
-                        <button
-                          onClick={() => {
-                            setSelectedChallan(challan);
-                            setShowPaymentModal(true);
-                          }}
-                          style={{
-                            ...styles.button,
-                            background: styles.success,
-                            color: 'white',
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            marginLeft: '8px'
-                          }}
-                        >
-                          Pay Now
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-      
-      <DrivingTips />
-      
-      {/* Challan Details Modal */}
-      <Modal isOpen={selectedChallan && !showPaymentModal} onClose={() => setSelectedChallan(null)} title="Challan Details">
-        {selectedChallan && (
-          <div>
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '12px', color: styles.textSecondary, marginBottom: '4px' }}>Challan ID</div>
-              <div style={{ fontSize: '18px', fontWeight: '600', color: styles.text }}>{selectedChallan.challanId}</div>
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <StatusBadge status={selectedChallan.status} />
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '12px', color: styles.textSecondary, marginBottom: '4px' }}>Vehicle Number</div>
-              <div style={{ fontSize: '16px', fontWeight: '500', color: styles.text }}>{selectedChallan.vehicleNumber}</div>
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '12px', color: styles.textSecondary, marginBottom: '4px' }}>Violation Type</div>
-              <div style={{ fontSize: '16px', fontWeight: '500', color: styles.text, textTransform: 'capitalize' }}>
-                {selectedChallan.violationType.replace('_', ' ')}
-              </div>
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '12px', color: styles.textSecondary, marginBottom: '4px' }}>Date &amp; Time</div>
-              <div style={{ fontSize: '16px', fontWeight: '500', color: styles.text }}>
-                {new Date(selectedChallan.timestamp).toLocaleString()}
-              </div>
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '12px', color: styles.textSecondary, marginBottom: '4px' }}>Location</div>
-              <div style={{ fontSize: '16px', fontWeight: '500', color: styles.text }}>{selectedChallan.location}</div>
-            </div>
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '12px', color: styles.textSecondary, marginBottom: '4px' }}>Fine Amount</div>
-              <div style={{ fontSize: '32px', fontWeight: '700', color: styles.error }}>₹{selectedChallan.fineAmount}</div>
-            </div>
-            <div style={{
-              padding: '16px',
-              background: styles.light,
-              borderRadius: '8px',
-              textAlign: 'center',
-              color: styles.textSecondary,
-              marginBottom: '16px'
-            }}>
-              📷 Violation Image Placeholder
-            </div>
-            {selectedChallan.status === 'Paid' && (
-              <button style={{
-                ...styles.button,
-                width: '100%',
-                background: styles.primary,
-                color: 'white'
-              }}>
-                📄 Download Receipt
-              </button>
-            )}
-          </div>
-        )}
-      </Modal>
-      
-      {/* Payment Modal */}
-      <Modal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)} title="Pay Challan">
-        {selectedChallan && (
-          <div>
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '14px', color: styles.textSecondary, marginBottom: '8px' }}>Challan ID: {selectedChallan.challanId}</div>
-              <div style={{ fontSize: '32px', fontWeight: '700', color: styles.text }}>₹{selectedChallan.fineAmount}</div>
-            </div>
-            
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '14px', fontWeight: '500', color: styles.text, marginBottom: '12px' }}>Select Payment Method</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <button style={{
-                  ...styles.button,
-                  background: styles.light,
-                  color: styles.text,
-                  justifyContent: 'flex-start',
-                  padding: '16px',
-                  width: '100%',
-                  textAlign: 'left'
-                }}>
-                  <span style={{ marginRight: '12px' }}>📱</span> UPI Payment
-                </button>
-                <button style={{
-                  ...styles.button,
-                  background: styles.light,
-                  color: styles.text,
-                  justifyContent: 'flex-start',
-                  padding: '16px',
-                  width: '100%',
-                  textAlign: 'left'
-                }}>
-                  <span style={{ marginRight: '12px' }}>💳</span> Credit/Debit Card
-                </button>
-                <button style={{
-                  ...styles.button,
-                  background: styles.light,
-                  color: styles.text,
-                  justifyContent: 'flex-start',
-                  padding: '16px',
-                  width: '100%',
-                  textAlign: 'left'
-                }}>
-                  <span style={{ marginRight: '12px' }}>🏦</span> Net Banking
-                </button>
-              </div>
-            </div>
-            
-            <button
-              onClick={() => {
-                alert('Payment Successful! (Demo Mode)');
-                setShowPaymentModal(false);
-                setSelectedChallan(null);
-              }}
-              style={{
-                ...styles.button,
-                width: '100%',
-                background: styles.success,
-                color: 'white',
-                fontWeight: '600'
-              }}
-            >
-              Confirm Payment
-            </button>
-          </div>
-        )}
-      </Modal>
-    </div>
-  );
-};
-
-const CitizenChallans = () => {
-  const { user, darkMode } = useAuth();
-  const styles = getStyles(darkMode);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('All');
-  const [selectedChallan, setSelectedChallan] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [filterRole, setFilterRole] = useState('All');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
   
-  const userChallans = mockViolations.filter(v => 
-    user?.vehicleNumbers?.includes(v.vehicleNumber)
-  );
+  useEffect(() => {
+    fetchUsers();
+  }, []);
   
-  const filteredChallans = userChallans.filter(c => {
-    const matchesSearch = c.challanId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'All' || c.status === filterStatus;
-    return matchesSearch && matchesFilter;
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch(window.location.origin.includes('localhost') ? 'http://localhost:5000/api/users' : '/api/users');
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = filterRole === 'All' || user.role === filterRole;
+    return matchesSearch && matchesRole;
   });
   
+  const toggleUserStatus = async (id, currentStatus) => {
+    try {
+      const user = users.find(u => u._id === id);
+      let newStatus;
+      
+      if (user.role === 'police' && currentStatus === 'Pending') {
+        newStatus = 'Active';
+      } else {
+        newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+      }
+      
+      const response = await fetch(`${window.location.origin.includes('localhost') ? 'http://localhost:5000' : ''}/api/users/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      
+      if (response.ok) {
+        setUsers(prev => prev.map(user => 
+          user._id === id ? { ...user, status: newStatus } : user
+        ));
+        
+        if (user.role === 'police' && currentStatus === 'Pending') {
+          alert('Police account verified successfully!');
+        } else {
+          alert(`User ${newStatus.toLowerCase()} successfully!`);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      alert('Error updating user status');
+    }
+  };
+  
+  const handleEditUser = (user) => {
+    setEditingUser(user);
+    setShowEditModal(true);
+  };
+  
+  const deleteUser = async (id) => {
+    try {
+      const response = await fetch(`${window.location.origin.includes('localhost') ? 'http://localhost:5000' : ''}/api/users/${id}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        setUsers(prev => prev.filter(user => user._id !== id));
+        alert('User deleted successfully!');
+      } else {
+        alert('Failed to delete user');
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Error deleting user');
+    } finally {
+      setShowDeleteConfirm(false);
+      setUserToDelete(null);
+    }
+  };
+  
+  const handleDeleteClick = (user) => {
+    setUserToDelete(user);
+    setShowDeleteConfirm(true);
+  };
+  
+  if (loading) {
+    return (
+      <div>
+        <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>User Management</h2>
+        <LoadingSpinner />
+      </div>
+    );
+  }
+  
   return (
     <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>My Challans</h2>
+      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>User Management</h2>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+        <StatCard title="Total Users" value={users.length} icon="👥" color="#2563EB" />
+        <StatCard title="Active Users" value={users.filter(u => u.status === 'Active').length} icon="✅" color="#10B981" />
+        <StatCard title="Police Officers" value={users.filter(u => u.role === 'police').length} icon="👮" color="#F59E0B" />
+        <StatCard title="Pending Verification" value={users.filter(u => u.status === 'Pending').length} icon="⏳" color="#EF4444" />
+      </div>
       
       <div style={styles.card}>
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
-          <SearchBar
-            placeholder="Search by Challan ID"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            style={{ ...styles.input, width: 'auto', minWidth: '150px' }}
-          >
-            <option value="All">All Status</option>
-            <option value="Paid">Paid</option>
-            <option value="Pending">Pending</option>
-            <option value="Cancelled">Cancelled</option>
-          </select>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ display: 'flex', gap: '16px', flex: 1, minWidth: '300px' }}>
+            <SearchBar placeholder="Search users..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} style={{ ...styles.input, width: 'auto', minWidth: '120px' }}>
+              <option value="All">All Roles</option>
+              <option value="citizen">Citizens</option>
+              <option value="police">Police</option>
+              <option value="admin">Admins</option>
+            </select>
+          </div>
         </div>
         
         <div style={{ overflowX: 'auto' }}>
           <table style={styles.table}>
             <thead>
               <tr>
-                <th style={styles.th}>Challan ID</th>
-                <th style={styles.th}>Vehicle</th>
-                <th style={styles.th}>Violation Type</th>
-                <th style={styles.th}>Date</th>
-                <th style={styles.th}>Location</th>
-                <th style={styles.th}>Amount</th>
+                <th style={styles.th}>Name</th>
+                <th style={styles.th}>Email</th>
+                <th style={styles.th}>Role</th>
                 <th style={styles.th}>Status</th>
-                <th style={styles.th}>Action</th>
+                <th style={styles.th}>Created</th>
+                <th style={styles.th}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredChallans.map(challan => (
-                <tr key={challan.challanId}>
-                  <td style={styles.td}>{challan.challanId}</td>
-                  <td style={styles.td}>{challan.vehicleNumber}</td>
+              {filteredUsers.map(user => (
+                <tr key={user._id}>
+                  <td style={styles.td}>{user.fullName}</td>
+                  <td style={styles.td}>{user.email}</td>
+                  <td style={styles.td}><span style={{ textTransform: 'capitalize', padding: '4px 8px', background: styles.light, borderRadius: '4px' }}>{user.role}</span></td>
+                  <td style={styles.td}><StatusBadge status={user.status} /></td>
+                  <td style={styles.td}>{new Date(user.createdAt).toLocaleDateString()}</td>
                   <td style={styles.td}>
-                    <span style={{ textTransform: 'capitalize' }}>{challan.violationType.replace('_', ' ')}</span>
-                  </td>
-                  <td style={styles.td}>{new Date(challan.timestamp).toLocaleDateString()}</td>
-                  <td style={styles.td}>{challan.location}</td>
-                  <td style={styles.td}>₹{challan.fineAmount}</td>
-                  <td style={styles.td}><StatusBadge status={challan.status} /></td>
-                  <td style={styles.td}>
-                    <button
-                      onClick={() => setSelectedChallan(challan)}
-                      style={{
-                        ...styles.button,
-                        background: styles.primary,
-                        color: 'white',
-                        padding: '6px 12px',
-                        fontSize: '12px'
-                      }}
-                    >
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        
-        {filteredChallans.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px', color: styles.textSecondary }}>
-            No challans found
-          </div>
-        )}
-      </div>
-      
-      <Modal isOpen={!!selectedChallan} onClose={() => setSelectedChallan(null)} title="Challan Details">
-        {selectedChallan && (
-          <div>
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '12px', color: styles.textSecondary }}>Challan ID</div>
-              <div style={{ fontSize: '18px', fontWeight: '600', color: styles.text }}>{selectedChallan.challanId}</div>
-            </div>
-            <StatusBadge status={selectedChallan.status} />
-            <div style={{ marginTop: '16px' }}>
-              <div style={{ fontSize: '12px', color: styles.textSecondary }}>Fine Amount</div>
-              <div style={{ fontSize: '32px', fontWeight: '700', color: styles.error }}>₹{selectedChallan.fineAmount}</div>
-            </div>
-          </div>
-        )}
-      </Modal>
-    </div>
-  );
-};
-
-const VehicleLookup = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  const [vehicleNumber, setVehicleNumber] = useState('');
-  const [results, setResults] = useState(null);
-  const [loading, setLoading] = useState(false);
-  
-  const handleSearch = () => {
-    if (!vehicleNumber.trim()) return;
-    
-    setLoading(true);
-    setTimeout(() => {
-      const found = mockViolations.filter(v => 
-        v.vehicleNumber.toLowerCase().includes(vehicleNumber.toLowerCase())
-      );
-      setResults(found);
-      setLoading(false);
-    }, 1000);
-  };
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Vehicle Lookup</h2>
-      
-      <div style={styles.card}>
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-          <SearchBar
-            placeholder="Enter Vehicle Number (e.g., MH12AB1234)"
-            value={vehicleNumber}
-            onChange={(e) => setVehicleNumber(e.target.value)}
-            onSearch={handleSearch}
-          />
-          <button
-            onClick={handleSearch}
-            style={{
-              ...styles.button,
-              background: styles.primary,
-              color: 'white'
-            }}
-          >
-            🔍 Search
-          </button>
-        </div>
-        
-        {loading && <LoadingSpinner />}
-        
-        {!loading && results !== null && (
-          <div>
-            {results.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: styles.textSecondary }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
-                <div style={{ fontSize: '18px', fontWeight: '500' }}>No Challans Found</div>
-                <div style={{ fontSize: '14px', marginTop: '8px' }}>This vehicle has a clean record!</div>
-              </div>
-            ) : (
-              <div>
-                <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>
-                  Found {results.length} challan(s) for {vehicleNumber.toUpperCase()}
-                </h3>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Challan ID</th>
-                      <th style={styles.th}>Violation Type</th>
-                      <th style={styles.th}>Date</th>
-                      <th style={styles.th}>Location</th>
-                      <th style={styles.th}>Amount</th>
-                      <th style={styles.th}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map(challan => (
-                      <tr key={challan.challanId}>
-                        <td style={styles.td}>{challan.challanId}</td>
-                        <td style={styles.td}>
-                          <span style={{ textTransform: 'capitalize' }}>{challan.violationType.replace('_', ' ')}</span>
-                        </td>
-                        <td style={styles.td}>{new Date(challan.timestamp).toLocaleDateString()}</td>
-                        <td style={styles.td}>{challan.location}</td>
-                        <td style={styles.td}>₹{challan.fineAmount}</td>
-                        <td style={styles.td}><StatusBadge status={challan.status} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const ViolationHistory = () => {
-  const { user, darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  
-  const userChallans = mockViolations.filter(v => 
-    user?.vehicleNumbers?.includes(v.vehicleNumber)
-  );
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Violation History</h2>
-      
-      <div style={styles.card}>
-        <h3 style={{ color: styles.text, fontSize: '20px', fontWeight: '600', marginBottom: '20px' }}>Complete History</h3>
-        
-        <div style={{ overflowX: 'auto' }}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Challan ID</th>
-                <th style={styles.th}>Vehicle</th>
-                <th style={styles.th}>Violation</th>
-                <th style={styles.th}>Date &amp; Time</th>
-                <th style={styles.th}>Location</th>
-                <th style={styles.th}>Amount</th>
-                <th style={styles.th}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {userChallans.map(challan => (
-                <tr key={challan.challanId}>
-                  <td style={styles.td}>{challan.challanId}</td>
-                  <td style={styles.td}>{challan.vehicleNumber}</td>
-                  <td style={styles.td}>
-                    <span style={{ textTransform: 'capitalize' }}>{challan.violationType.replace('_', ' ')}</span>
-                  </td>
-                  <td style={styles.td}>{new Date(challan.timestamp).toLocaleString()}</td>
-                  <td style={styles.td}>{challan.location}</td>
-                  <td style={styles.td}>₹{challan.fineAmount}</td>
-                  <td style={styles.td}><StatusBadge status={challan.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ==================== POLICE PAGES ====================
-
-const PoliceDashboard = () => {
-  const { user, darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>
-        Welcome, Officer {user?.officerId}!
-      </h2>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-        <StatCard title="Violations Today" value={violationStats.today} icon="📊" color="#2563EB" />
-        <StatCard title="Violations This Week" value={violationStats.thisWeek} icon="📈" color="#F59E0B" />
-        <StatCard title="Violations This Month" value={violationStats.thisMonth} icon="📅" color="#10B981" />
-        <StatCard title="Pending Challans" value={mockViolations.filter(v => v.status === 'Pending').length} icon="⚠️" color="#EF4444" />
-      </div>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Violation Types Distribution</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={violationStats.byType}>
-              <CartesianGrid strokeDasharray="3 3" stroke={styles.border} />
-              <XAxis dataKey="type" stroke={styles.textSecondary} />
-              <YAxis stroke={styles.textSecondary} />
-              <Tooltip contentStyle={{ background: styles.cardBg, border: `1px solid ${styles.border}` }} />
-              <Bar dataKey="count" fill={styles.primary} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Violations Per Day (Last 7 Days)</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={violationsPerDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke={styles.border} />
-              <XAxis dataKey="date" stroke={styles.textSecondary} />
-              <YAxis stroke={styles.textSecondary} />
-              <Tooltip contentStyle={{ background: styles.cardBg, border: `1px solid ${styles.border}` }} />
-              <Line type="monotone" dataKey="count" stroke={styles.primary} strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      
-      <div style={styles.card}>
-        <h3 style={{ color: styles.text, fontSize: '20px', fontWeight: '600', marginBottom: '20px' }}>Recent Activity</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {mockViolations.slice(0, 5).map(v => (
-            <div key={v.challanId} style={{
-              padding: '12px',
-              background: styles.light,
-              borderRadius: '8px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '500', color: styles.text }}>
-                  {v.challanId} - {v.vehicleNumber}
-                </div>
-                <div style={{ fontSize: '12px', color: styles.textSecondary, marginTop: '4px' }}>
-                  {v.violationType.replace('_', ' ')} at {v.location}
-                </div>
-              </div>
-              <div style={{ fontSize: '12px', color: styles.textSecondary }}>
-                {new Date(v.timestamp).toLocaleString()}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const RecordViolation = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  const [mode, setMode] = useState('upload');
-  const [processing, setProcessing] = useState(false);
-  const [processed, setProcessed] = useState(false);
-  const [detectionsCount, setDetectionsCount] = useState(0);
-  
-  const handleProcessVideo = () => {
-    setProcessing(true);
-    setTimeout(() => {
-      setProcessing(false);
-      setProcessed(true);
-      setDetectionsCount(Math.floor(Math.random() * 10) + 3);
-    }, 2000);
-  };
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Record Violation</h2>
-      
-      <div style={styles.card}>
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', borderRadius: '8px', overflow: 'hidden', background: styles.light }}>
-          <button
-            onClick={() => setMode('upload')}
-            style={{
-              flex: 1,
-              padding: '12px',
-              border: 'none',
-              background: mode === 'upload' ? styles.primary : 'transparent',
-              color: mode === 'upload' ? 'white' : styles.text,
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            📤 Upload Video
-          </button>
-          <button
-            onClick={() => setMode('live')}
-            style={{
-              flex: 1,
-              padding: '12px',
-              border: 'none',
-              background: mode === 'live' ? styles.primary : 'transparent',
-              color: mode === 'live' ? 'white' : styles.text,
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            📹 Live Camera
-          </button>
-        </div>
-        
-        {mode === 'upload' ? (
-          <div>
-            <div style={{
-              padding: '40px',
-              border: `2px dashed ${styles.border}`,
-              borderRadius: '12px',
-              textAlign: 'center',
-              marginBottom: '24px'
-            }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📁</div>
-              <div style={{ fontSize: '16px', color: styles.text, marginBottom: '8px', fontWeight: '500' }}>
-                Choose CCTV footage or drop file here
-              </div>
-              <div style={{ fontSize: '12px', color: styles.textSecondary }}>Supported formats: MP4, AVI, MOV</div>
-              <input type="file" accept="video/*" style={{ marginTop: '16px' }} />
-            </div>
-            
-            <button
-              onClick={handleProcessVideo}
-              disabled={processing}
-              style={{
-                ...styles.button,
-                background: styles.primary,
-                color: 'white',
-                width: '100%'
-              }}
-            >
-              {processing ? '⏳ Processing Video...' : '▶️ Process Video'}
-            </button>
-            
-            {processed && (
-              <div style={{
-                marginTop: '24px',
-                padding: '20px',
-                background: '#DCFCE7',
-                color: '#166534',
-                borderRadius: '8px',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '48px', marginBottom: '12px' }}>✓</div>
-                <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
-                  Processing Complete!
-                </div>
-                <div style={{ fontSize: '16px', marginBottom: '16px' }}>
-                  {detectionsCount} violations detected
-                </div>
-                <button style={{
-                  ...styles.button,
-                  background: '#166534',
-                  color: 'white'
-                }}>
-                  View Detected Violations →
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div>
-            <div style={{
-              padding: '60px',
-              background: styles.light,
-              borderRadius: '12px',
-              textAlign: 'center',
-              marginBottom: '24px'
-            }}>
-              <div style={{ fontSize: '64px', marginBottom: '16px' }}>📹</div>
-              <div style={{ fontSize: '18px', color: styles.text, marginBottom: '8px', fontWeight: '500' }}>
-                Connect to CCTV/Webcam
-              </div>
-              <div style={{ fontSize: '14px', color: styles.textSecondary }}>
-                Live detection will start automatically
-              </div>
-            </div>
-            
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button style={{
-                ...styles.button,
-                flex: 1,
-                background: styles.success,
-                color: 'white'
-              }}>
-                ▶️ Start Detection
-              </button>
-              <button style={{
-                ...styles.button,
-                flex: 1,
-                background: styles.error,
-                color: 'white'
-              }}>
-                ⏹ Stop Detection
-              </button>
-            </div>
-            
-            <div style={{
-              marginTop: '24px',
-              padding: '16px',
-              background: styles.light,
-              borderRadius: '8px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div style={{ color: styles.text }}>Real-time Violation Counter:</div>
-              <div style={{ fontSize: '24px', fontWeight: '700', color: styles.primary }}>0</div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const DetectedViolations = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  const [violations, setViolations] = useState([
-    { id: 1, frame: 'Frame 245', plate: 'MH12XY7890', type: 'helmet', location: 'MG Road Junction', timestamp: '2025-11-02 14:30:45', status: 'Detected' },
-    { id: 2, frame: 'Frame 512', plate: 'DL08AB1234', type: 'red_light', location: 'FC Road Signal', timestamp: '2025-11-02 14:31:12', status: 'Detected' },
-    { id: 3, frame: 'Frame 789', plate: 'MH14CD5678', type: 'triple_riding', location: 'Baner Chowk', timestamp: '2025-11-02 14:32:05', status: 'Detected' }
-  ]);
-  
-  const handleAction = (id, action) => {
-    setViolations(prev => prev.map(v => 
-      v.id === id ? { ...v, status: action === 'generate' ? 'Challan Generated' : 'Rejected' } : v
-    ));
-  };
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Detected Violations</h2>
-      
-      <div style={styles.card}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Frame</th>
-                <th style={styles.th}>Vehicle Plate</th>
-                <th style={styles.th}>Violation Type</th>
-                <th style={styles.th}>Location</th>
-                <th style={styles.th}>Timestamp</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {violations.map(v => (
-                <tr key={v.id}>
-                  <td style={styles.td}>
-                    <div style={{
-                      width: '80px',
-                      height: '50px',
-                      background: styles.light,
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '10px',
-                      color: styles.textSecondary
-                    }}>
-                      {v.frame}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button 
+                        onClick={() => toggleUserStatus(user._id, user.status)} 
+                        style={{ 
+                          ...styles.button, 
+                          background: user.role === 'police' && user.status === 'Pending' ? styles.success : (user.status === 'Active' ? styles.warning : styles.success), 
+                          color: 'white', 
+                          padding: '8px 12px', 
+                          fontSize: '12px',
+                          minWidth: '80px'
+                        }}
+                      >
+                        {user.role === 'police' && user.status === 'Pending' ? 'Verify' : (user.status === 'Active' ? 'Deactivate' : 'Activate')}
+                      </button>
+                      <button 
+                        onClick={() => handleEditUser(user)}
+                        style={{ 
+                          ...styles.button, 
+                          background: styles.primary, 
+                          color: 'white', 
+                          padding: '8px 12px', 
+                          fontSize: '12px',
+                          minWidth: '60px'
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteClick(user)}
+                        style={{ 
+                          ...styles.button, 
+                          background: styles.error, 
+                          color: 'white', 
+                          padding: '8px 12px', 
+                          fontSize: '12px',
+                          minWidth: '60px'
+                        }}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
-                  <td style={styles.td}>{v.plate}</td>
-                  <td style={styles.td}>
-                    <span style={{ textTransform: 'capitalize' }}>{v.type.replace('_', ' ')}</span>
-                  </td>
-                  <td style={styles.td}>{v.location}</td>
-                  <td style={styles.td}>{v.timestamp}</td>
-                  <td style={styles.td}><StatusBadge status={v.status} /></td>
-                  <td style={styles.td}>
-                    {v.status === 'Detected' && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={() => handleAction(v.id, 'generate')}
-                          style={{
-                            ...styles.button,
-                            background: styles.success,
-                            color: 'white',
-                            padding: '6px 12px',
-                            fontSize: '12px'
-                          }}
-                        >
-                          Generate
-                        </button>
-                        <button
-                          onClick={() => handleAction(v.id, 'reject')}
-                          style={{
-                            ...styles.button,
-                            background: styles.error,
-                            color: 'white',
-                            padding: '6px 12px',
-                            fontSize: '12px'
-                          }}
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         
-        <div style={{ marginTop: '24px', textAlign: 'right' }}>
-          <button style={{
-            ...styles.button,
-            background: styles.primary,
-            color: 'white'
+        {filteredUsers.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px', color: styles.textSecondary }}>
+            No users found
+          </div>
+        )}
+      </div>
+      
+      {/* Edit User Modal */}
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit User">
+        {editingUser && (
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const userData = {
+              fullName: formData.get('fullName'),
+              email: formData.get('email'),
+              role: formData.get('role')
+            };
+            if (formData.get('role') === 'citizen') {
+              userData.vehicleNumbers = formData.get('vehicleNumbers')?.split(',').map(v => v.trim()) || [];
+            }
+            
+            setUsers(prev => prev.map(user => 
+              user._id === editingUser._id ? { ...user, ...userData } : user
+            ));
+            setShowEditModal(false);
+            alert('User updated successfully!');
           }}>
-            Submit All Approved
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const UpdateChallanStatus = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [selectedAction, setSelectedAction] = useState(null);
-  
-  const filteredChallans = mockViolations.filter(v => 
-    v.challanId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  
-  const handleStatusChange = (challanId, action) => {
-    setSelectedAction({ challanId, action });
-    setShowConfirm(true);
-  };
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Update Challan Status</h2>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Full Name</label>
+              <input name="fullName" type="text" defaultValue={editingUser.fullName} required style={styles.input} />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Email</label>
+              <input name="email" type="email" defaultValue={editingUser.email} required style={styles.input} />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Role</label>
+              <select name="role" defaultValue={editingUser.role} required style={styles.input}>
+                <option value="citizen">Citizen</option>
+                <option value="police">Police Officer</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            {editingUser.role === 'citizen' && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Vehicle Numbers</label>
+                <input name="vehicleNumbers" type="text" defaultValue={editingUser.vehicleNumbers?.join(', ')} style={styles.input} placeholder="e.g., MH12AB1234, MH14CD5678" />
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button type="submit" style={{ ...styles.button, flex: 1, background: styles.primary, color: 'white' }}>Update User</button>
+              <button type="button" onClick={() => setShowEditModal(false)} style={{ ...styles.button, flex: 1, background: styles.light, color: styles.text }}>Cancel</button>
+            </div>
+          </form>
+        )}
+      </Modal>
       
-      <div style={styles.card}>
-        <input
-          type="text"
-          placeholder="Search by Challan ID or Vehicle Number"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ ...styles.input, marginBottom: '20px' }}
-        />
-        
-        <div style={{ overflowX: 'auto' }}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Challan ID</th>
-                <th style={styles.th}>Vehicle</th>
-                <th style={styles.th}>Violation</th>
-                <th style={styles.th}>Amount</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredChallans.map(challan => (
-                <tr key={challan.challanId}>
-                  <td style={styles.td}>{challan.challanId}</td>
-                  <td style={styles.td}>{challan.vehicleNumber}</td>
-                  <td style={styles.td}>
-                    <span style={{ textTransform: 'capitalize' }}>{challan.violationType.replace('_', ' ')}</span>
-                  </td>
-                  <td style={styles.td}>₹{challan.fineAmount}</td>
-                  <td style={styles.td}><StatusBadge status={challan.status} /></td>
-                  <td style={styles.td}>
-                    <select
-                      onChange={(e) => handleStatusChange(challan.challanId, e.target.value)}
-                      style={{
-                        ...styles.input,
-                        padding: '6px 12px',
-                        fontSize: '12px'
-                      }}
-                      defaultValue=""
-                    >
-                      <option value="" disabled>Select Action</option>
-                      <option value="paid">Mark as Paid</option>
-                      <option value="escalated">Mark as Escalated</option>
-                      <option value="cancelled">Cancel Challan</option>
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      
-      <Modal isOpen={showConfirm} onClose={() => setShowConfirm(false)} title="Confirm Action">
+      {/* Delete Confirmation Modal */}
+      <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Confirm Delete">
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
-          <div style={{ fontSize: '16px', color: styles.text, marginBottom: '24px' }}>
-            Are you sure you want to update the status of challan {selectedAction?.challanId}?
+          <div style={{ fontSize: '18px', fontWeight: '600', color: styles.text, marginBottom: '8px' }}>
+            Delete User
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ fontSize: '14px', color: styles.textSecondary, marginBottom: '24px' }}>
+            Are you sure you want to delete <strong>{userToDelete?.fullName}</strong>? This action cannot be undone.
+          </div>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
             <button
-              onClick={() => {
-                alert('Status updated successfully!');
-                setShowConfirm(false);
-              }}
+              onClick={() => deleteUser(userToDelete?._id)}
               style={{
                 ...styles.button,
-                flex: 1,
-                background: styles.primary,
-                color: 'white'
+                background: styles.error,
+                color: 'white',
+                padding: '12px 24px'
               }}
             >
-              Confirm
+              Delete
             </button>
             <button
-              onClick={() => setShowConfirm(false)}
+              onClick={() => setShowDeleteConfirm(false)}
               style={{
                 ...styles.button,
-                flex: 1,
                 background: styles.light,
-                color: styles.text
+                color: styles.text,
+                padding: '12px 24px'
               }}
             >
               Cancel
@@ -1889,674 +1257,13 @@ const UpdateChallanStatus = () => {
   );
 };
 
-// ==================== ADMIN PAGES ====================
+// Admin components are loaded from separate files
 
-const AdminDashboard = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  
-  const totalRevenue = fineDistribution.reduce((sum, item) => sum + item.amount, 0);
-  const pendingAmount = fineDistribution.find(f => f.category === 'Pending')?.amount || 0;
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Admin Dashboard</h2>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-        <StatCard title="Total Violations" value={violationStats.thisMonth} icon="🚦" color="#2563EB" />
-        <StatCard title="Total Revenue" value={`₹${(totalRevenue / 1000).toFixed(0)}K`} icon="💰" color="#10B981" />
-        <StatCard title="Pending Payments" value={`₹${(pendingAmount / 1000).toFixed(0)}K`} icon="⏳" color="#F59E0B" />
-        <StatCard title="Active Officers" value="12" icon="👮" color="#8B5CF6" />
-        <StatCard title="Top Location" value="MG Road" icon="📍" color="#EF4444" subtitle="45 violations" />
-        <StatCard title="This Month" value="+642" icon="📈" color="#06B6D4" subtitle="violations" />
-      </div>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Violations Trend (7 Days)</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={violationsPerDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke={styles.border} />
-              <XAxis dataKey="date" stroke={styles.textSecondary} />
-              <YAxis stroke={styles.textSecondary} />
-              <Tooltip contentStyle={{ background: styles.cardBg, border: `1px solid ${styles.border}` }} />
-              <Line type="monotone" dataKey="count" stroke="#2563EB" strokeWidth={3} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-        
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Fine Distribution</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={fineDistribution}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={(entry) => entry.category}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="percentage"
-              >
-                {fineDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ background: styles.cardBg, border: `1px solid ${styles.border}` }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Violation Types</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={violationStats.byType}>
-              <CartesianGrid strokeDasharray="3 3" stroke={styles.border} />
-              <XAxis dataKey="type" stroke={styles.textSecondary} />
-              <YAxis stroke={styles.textSecondary} />
-              <Tooltip contentStyle={{ background: styles.cardBg, border: `1px solid ${styles.border}` }} />
-              <Bar dataKey="count" fill="#F97316" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Payment Trends (6 Months)</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={paymentTrends}>
-              <CartesianGrid strokeDasharray="3 3" stroke={styles.border} />
-              <XAxis dataKey="month" stroke={styles.textSecondary} />
-              <YAxis stroke={styles.textSecondary} />
-              <Tooltip contentStyle={{ background: styles.cardBg, border: `1px solid ${styles.border}` }} />
-              <Area type="monotone" dataKey="revenue" stroke="#10B981" fill="#10B981" fillOpacity={0.3} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const UserManagement = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  const [showModal, setShowModal] = useState(false);
-  const [officers, setOfficers] = useState([
-    { id: 1, officerId: 'POL001', name: 'Rajesh Kumar', username: 'officer_raj', status: 'Active' },
-    { id: 2, officerId: 'POL002', name: 'Priya Sharma', username: 'officer_priya', status: 'Active' },
-    { id: 3, officerId: 'POL003', name: 'Amit Patel', username: 'officer_amit', status: 'Inactive' }
-  ]);
-  
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700' }}>User Management</h2>
-        <button
-          onClick={() => setShowModal(true)}
-          style={{
-            ...styles.button,
-            background: styles.primary,
-            color: 'white'
-          }}
-        >
-          ➕ Add New Officer
-        </button>
-      </div>
-      
-      <div style={styles.card}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Officer ID</th>
-              <th style={styles.th}>Name</th>
-              <th style={styles.th}>Username</th>
-              <th style={styles.th}>Status</th>
-              <th style={styles.th}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {officers.map(officer => (
-              <tr key={officer.id}>
-                <td style={styles.td}>{officer.officerId}</td>
-                <td style={styles.td}>{officer.name}</td>
-                <td style={styles.td}>{officer.username}</td>
-                <td style={styles.td}>
-                  <StatusBadge status={officer.status} />
-                </td>
-                <td style={styles.td}>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button style={{
-                      ...styles.button,
-                      background: styles.primary,
-                      color: 'white',
-                      padding: '6px 12px',
-                      fontSize: '12px'
-                    }}>
-                      ✏️ Edit
-                    </button>
-                    <button style={{
-                      ...styles.button,
-                      background: styles.error,
-                      color: 'white',
-                      padding: '6px 12px',
-                      fontSize: '12px'
-                    }}>
-                      🗑️ Delete
-                    </button>
-                    <button style={{
-                      ...styles.button,
-                      background: styles.warning,
-                      color: 'white',
-                      padding: '6px 12px',
-                      fontSize: '12px'
-                    }}>
-                      🔄 Reset
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add New Officer">
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          alert('Officer added successfully!');
-          setShowModal(false);
-        }}>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Name</label>
-            <input type="text" required style={styles.input} placeholder="Enter officer name" />
-          </div>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Username</label>
-            <input type="text" required style={styles.input} placeholder="Enter username" />
-          </div>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Password</label>
-            <input type="password" required style={styles.input} placeholder="Enter password" />
-          </div>
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Officer ID</label>
-            <input type="text" required style={styles.input} placeholder="e.g., POL004" />
-          </div>
-          <button type="submit" style={{
-            ...styles.button,
-            width: '100%',
-            background: styles.primary,
-            color: 'white'
-          }}>
-            Add Officer
-          </button>
-        </form>
-      </Modal>
-    </div>
-  );
-};
-
-const ViolationManagement = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [typeFilter, setTypeFilter] = useState('All');
-  
-  const filteredViolations = mockViolations.filter(v => {
-    const matchesSearch = v.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          v.challanId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || v.status === statusFilter;
-    const matchesType = typeFilter === 'All' || v.violationType === typeFilter;
-    return matchesSearch && matchesStatus && matchesType;
-  });
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Violation Management</h2>
-      
-      <div style={styles.card}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
-          <input
-            type="text"
-            placeholder="Search by Vehicle/Challan ID"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={styles.input}
-          />
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={styles.input}>
-            <option value="All">All Status</option>
-            <option value="Paid">Paid</option>
-            <option value="Pending">Pending</option>
-            <option value="Cancelled">Cancelled</option>
-          </select>
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={styles.input}>
-            <option value="All">All Types</option>
-            <option value="helmet">Helmet</option>
-            <option value="red_light">Red Light</option>
-            <option value="triple_riding">Triple Riding</option>
-            <option value="speeding">Speeding</option>
-          </select>
-          <button style={{
-            ...styles.button,
-            background: styles.success,
-            color: 'white'
-          }}>
-            📥 Export CSV
-          </button>
-        </div>
-        
-        <div style={{ overflowX: 'auto' }}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Challan ID</th>
-                <th style={styles.th}>Vehicle</th>
-                <th style={styles.th}>Type</th>
-                <th style={styles.th}>Date</th>
-                <th style={styles.th}>Location</th>
-                <th style={styles.th}>Amount</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredViolations.map(v => (
-                <tr key={v.challanId}>
-                  <td style={styles.td}>{v.challanId}</td>
-                  <td style={styles.td}>{v.vehicleNumber}</td>
-                  <td style={styles.td}>
-                    <span style={{ textTransform: 'capitalize' }}>{v.violationType.replace('_', ' ')}</span>
-                  </td>
-                  <td style={styles.td}>{new Date(v.timestamp).toLocaleDateString()}</td>
-                  <td style={styles.td}>{v.location}</td>
-                  <td style={styles.td}>₹{v.fineAmount}</td>
-                  <td style={styles.td}><StatusBadge status={v.status} /></td>
-                  <td style={styles.td}>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button style={{
-                        ...styles.button,
-                        background: styles.primary,
-                        color: 'white',
-                        padding: '6px 12px',
-                        fontSize: '12px'
-                      }}>
-                        👁️ View
-                      </button>
-                      <button style={{
-                        ...styles.button,
-                        background: styles.warning,
-                        color: 'white',
-                        padding: '6px 12px',
-                        fontSize: '12px'
-                      }}>
-                        ✏️ Edit
-                      </button>
-                      <button style={{
-                        ...styles.button,
-                        background: styles.error,
-                        color: 'white',
-                        padding: '6px 12px',
-                        fontSize: '12px'
-                      }}>
-                        🗑️ Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const PaymentOverview = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  
-  const totalCollected = fineDistribution.find(f => f.category === 'Paid')?.amount || 0;
-  const pendingAmount = fineDistribution.find(f => f.category === 'Pending')?.amount || 0;
-  const thisMonth = paymentTrends[paymentTrends.length - 1]?.revenue || 0;
-  const successRate = ((totalCollected / (totalCollected + pendingAmount)) * 100).toFixed(1);
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Payment Overview</h2>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-        <StatCard title="Total Collected" value={`₹${(totalCollected / 1000).toFixed(0)}K`} icon="💰" color="#10B981" />
-        <StatCard title="Pending Amount" value={`₹${(pendingAmount / 1000).toFixed(0)}K`} icon="⏳" color="#F59E0B" />
-        <StatCard title="This Month Revenue" value={`₹${(thisMonth / 1000).toFixed(0)}K`} icon="📊" color="#2563EB" />
-        <StatCard title="Success Rate" value={`${successRate}%`} icon="✓" color="#8B5CF6" />
-      </div>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Monthly Revenue (6 Months)</h3>
-          <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: styles.light, borderRadius: '8px' }}>
-            <div style={{ textAlign: 'center', color: styles.textSecondary }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>💰</div>
-              <div>Monthly Revenue Chart</div>
-            </div>
-          </div>
-        </div>
-        
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Payment Status</h3>
-          <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: styles.light, borderRadius: '8px' }}>
-            <div style={{ textAlign: 'center', color: styles.textSecondary }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🍰</div>
-              <div>Payment Status Chart</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div style={styles.card}>
-        <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Download Reports</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-          <button style={{
-            ...styles.button,
-            background: styles.primary,
-            color: 'white'
-          }}>
-            📄 Monthly Report
-          </button>
-          <button style={{
-            ...styles.button,
-            background: styles.secondary,
-            color: 'white'
-          }}>
-            📊 Quarterly Report
-          </button>
-          <button style={{
-            ...styles.button,
-            background: styles.success,
-            color: 'white'
-          }}>
-            📈 Annual Report
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const LocationAnalytics = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Location Analytics</h2>
-      
-      <div style={{ ...styles.card, marginBottom: '24px' }}>
-        <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Top Violation Locations Map</h3>
-        <div style={{
-          padding: '80px',
-          background: styles.light,
-          borderRadius: '12px',
-          textAlign: 'center',
-          color: styles.textSecondary
-        }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>🗺️</div>
-          <div style={{ fontSize: '18px', fontWeight: '500' }}>Interactive Location Heatmap</div>
-          <div style={{ fontSize: '14px', marginTop: '8px' }}>Visualization of high-violation zones</div>
-        </div>
-      </div>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Top 5 Locations</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {topLocations.map((loc, index) => (
-              <div key={index} style={{
-                padding: '16px',
-                background: styles.light,
-                borderRadius: '8px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <div>
-                  <div style={{ fontSize: '16px', fontWeight: '500', color: styles.text }}>
-                    {index + 1}. {loc.location}
-                  </div>
-                  <div style={{ fontSize: '12px', color: styles.textSecondary, marginTop: '4px' }}>
-                    High violation area
-                  </div>
-                </div>
-                <div style={{
-                  fontSize: '24px',
-                  fontWeight: '700',
-                  color: styles.primary
-                }}>
-                  {loc.violations}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Violations by Location</h3>
-          <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: styles.light, borderRadius: '8px' }}>
-            <div style={{ textAlign: 'center', color: styles.textSecondary }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📍</div>
-              <div>Violations by Location Chart</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div style={styles.card}>
-        <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Accident-Prone Zones</h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-          {['MG Road Junction', 'FC Road Signal', 'Baner Chowk'].map((zone, index) => (
-            <div key={index} style={{
-              padding: '12px 20px',
-              background: '#FEE2E2',
-              color: '#991B1B',
-              borderRadius: '20px',
-              fontSize: '14px',
-              fontWeight: '500',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <span>🚨</span>
-              <span>{zone}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Notification Settings Component
-const NotificationSettings = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  
-  return (
-    <div style={{ ...styles.card, marginTop: '24px' }}>
-      <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>📱 Notification Settings</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {[
-          { label: 'SMS Notifications for New Challans', checked: true },
-          { label: 'Email Alerts for Payment Due', checked: true },
-          { label: 'Push Notifications', checked: false },
-          { label: 'Weekly Violation Summary', checked: true }
-        ].map((setting, index) => (
-          <div key={index} style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '16px',
-            background: styles.light,
-            borderRadius: '8px'
-          }}>
-            <div style={{ color: styles.text, fontWeight: '500' }}>{setting.label}</div>
-            <label style={{ position: 'relative', display: 'inline-block', width: '50px', height: '24px' }}>
-              <input type="checkbox" defaultChecked={setting.checked} style={{ opacity: 0, width: 0, height: 0 }} />
-              <span style={{
-                position: 'absolute',
-                cursor: 'pointer',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: setting.checked ? styles.success : styles.textSecondary,
-                borderRadius: '24px',
-                transition: '0.4s'
-              }}>
-                <span style={{
-                  position: 'absolute',
-                  content: '',
-                  height: '18px',
-                  width: '18px',
-                  left: setting.checked ? '28px' : '3px',
-                  bottom: '3px',
-                  background: 'white',
-                  borderRadius: '50%',
-                  transition: '0.4s'
-                }}></span>
-              </span>
-            </label>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const SystemSettings = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  const [fineAmounts, setFineAmounts] = useState({
-    helmet: 1000,
-    red_light: 5000,
-    triple_riding: 2000,
-    speeding: 3000,
-    wrong_parking: 500
-  });
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>System Settings</h2>
-      
-      <div style={styles.card}>
-        <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Fine Amounts Configuration</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-          {Object.entries(fineAmounts).map(([key, value]) => (
-            <div key={key}>
-              <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500', textTransform: 'capitalize' }}>
-                {key.replace('_', ' ')}
-              </label>
-              <input
-                type="number"
-                value={value}
-                onChange={(e) => setFineAmounts({ ...fineAmounts, [key]: parseInt(e.target.value) })}
-                style={styles.input}
-              />
-            </div>
-          ))}
-        </div>
-        <button style={{
-          ...styles.button,
-          background: styles.primary,
-          color: 'white'
-        }}>
-          💾 Update Fine Amounts
-        </button>
-      </div>
-      
-      <div style={{ ...styles.card, marginTop: '24px' }}>
-        <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>System Thresholds</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Speed Limit (km/h)</label>
-            <input type="number" defaultValue="80" style={styles.input} />
-          </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', color: styles.text, fontWeight: '500' }}>Helmet Detection Confidence (%)</label>
-            <input type="number" defaultValue="85" style={styles.input} />
-          </div>
-        </div>
-      </div>
-      
-      <div style={{ ...styles.card, marginTop: '24px' }}>
-        <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>Feature Toggles</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {[
-            { label: 'Auto-Challan Generation', checked: true },
-            { label: 'SMS Notifications', checked: true },
-            { label: 'Email Alerts', checked: false },
-            { label: 'Real-time Detection', checked: true }
-          ].map((toggle, index) => (
-            <div key={index} style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '16px',
-              background: styles.light,
-              borderRadius: '8px'
-            }}>
-              <div style={{ color: styles.text, fontWeight: '500' }}>{toggle.label}</div>
-              <label style={{ position: 'relative', display: 'inline-block', width: '50px', height: '24px' }}>
-                <input type="checkbox" defaultChecked={toggle.checked} style={{ opacity: 0, width: 0, height: 0 }} />
-                <span style={{
-                  position: 'absolute',
-                  cursor: 'pointer',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: toggle.checked ? styles.success : styles.textSecondary,
-                  borderRadius: '24px',
-                  transition: '0.4s'
-                }}>
-                  <span style={{
-                    position: 'absolute',
-                    content: '',
-                    height: '18px',
-                    width: '18px',
-                    left: toggle.checked ? '28px' : '3px',
-                    bottom: '3px',
-                    background: 'white',
-                    borderRadius: '50%',
-                    transition: '0.4s'
-                  }}></span>
-                </span>
-              </label>
-            </div>
-          ))}
-        </div>
-        <button style={{
-          ...styles.button,
-          background: styles.primary,
-          color: 'white',
-          marginTop: '24px'
-        }}>
-          💾 Save Settings
-        </button>
-      </div>
-      
-      <NotificationSettings />
-    </div>
-  );
-};
+// All components are loaded from separate files
 
 // ==================== LAYOUT ====================
 
-const DashboardLayout = ({ children }) => {
+const DashboardLayout = ({ children, currentPage, onPageChange }) => {
   const { user, darkMode } = useAuth();
   const styles = getStyles(darkMode);
   
@@ -2567,7 +1274,7 @@ const DashboardLayout = ({ children }) => {
         display: 'flex',
         flexDirection: window.innerWidth < 768 ? 'column' : 'row'
       }}>
-        <Sidebar role={user?.role} />
+        <Sidebar role={user?.role} currentPage={currentPage} onPageChange={onPageChange} />
         <div style={{ 
           flex: 1, 
           padding: window.innerWidth < 768 ? '16px 12px 80px 12px' : '24px', 
@@ -2580,38 +1287,7 @@ const DashboardLayout = ({ children }) => {
   );
 };
 
-// Help & Support Component
-const HelpSupport = () => {
-  const { darkMode } = useAuth();
-  const styles = getStyles(darkMode);
-  
-  return (
-    <div>
-      <h2 style={{ color: styles.text, fontSize: '28px', fontWeight: '700', marginBottom: '24px' }}>Help & Support</h2>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>📞 Contact Information</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ color: styles.text }}>📧 Email: support@yatayat.gov.in</div>
-            <div style={{ color: styles.text }}>📱 Phone: +91-1800-123-4567</div>
-            <div style={{ color: styles.text }}>🕒 Hours: 24/7 Support</div>
-          </div>
-        </div>
-        
-        <div style={styles.card}>
-          <h3 style={{ color: styles.text, fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>❓ FAQ</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ color: styles.text, fontSize: '14px' }}>• How to pay challan online?</div>
-            <div style={{ color: styles.text, fontSize: '14px' }}>• How to check vehicle violations?</div>
-            <div style={{ color: styles.text, fontSize: '14px' }}>• How to download receipt?</div>
-            <div style={{ color: styles.text, fontSize: '14px' }}>• How to dispute a challan?</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+
 
 // ==================== MAIN APP ====================
 
@@ -2619,31 +1295,59 @@ const AppContent = () => {
   const [currentPage, setCurrentPage] = useState('login');
   const { user } = useAuth();
   
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+  
+  const renderPageContent = () => {
+    if (user?.role === 'citizen') {
+      switch(currentPage) {
+        case 'dashboard': return <CitizenDashboard />;
+        case 'challans': return <CitizenChallans />;
+        case 'lookup': return <VehicleLookup />;
+        case 'history': return <ViolationHistory />;
+        case 'help': return <HelpSupport />;
+        default: return <CitizenDashboard />;
+      }
+    }
+    
+    if (user?.role === 'police') {
+      switch(currentPage) {
+        case 'dashboard': return <PoliceDashboard />;
+        case 'record': return <RecordViolation />;
+        case 'detected': return <DetectedViolations />;
+        case 'update': return <UpdateChallanStatus />;
+        case 'help': return <HelpSupport />;
+        default: return <PoliceDashboard />;
+      }
+    }
+    
+    if (user?.role === 'admin') {
+      switch(currentPage) {
+        case 'dashboard': return <AdminDashboard />;
+        case 'users': return <UserManagement />;
+        case 'violations': return <ViolationManagement />;
+        case 'payments': return <PaymentOverview />;
+        case 'analytics': return <LocationAnalytics />;
+        case 'settings': return <SystemSettings />;
+        case 'help': return <AdminHelpSupport />;
+        default: return <AdminDashboard />;
+      }
+    }
+    
+    return <div>Page not found</div>;
+  };
+  
   const renderPage = () => {
-    console.log('Rendering page:', { user: user?.username, currentPage });
-    
     if (!user) {
-      console.log('No user, showing login page');
-      return <LoginPage onLogin={() => {
-        console.log('Login callback triggered');
-        setCurrentPage('dashboard');
-      }} />;
+      return <LoginPage onLogin={() => setCurrentPage('dashboard')} />;
     }
     
-    console.log('User logged in, showing dashboard for role:', user.role);
-    switch(currentPage) {
-      case 'dashboard':
-        if (user.role === 'citizen') return <DashboardLayout><CitizenDashboard /></DashboardLayout>;
-        if (user.role === 'police') return <DashboardLayout><PoliceDashboard /></DashboardLayout>;
-        if (user.role === 'admin') return <DashboardLayout><AdminDashboard /></DashboardLayout>;
-        break;
-      case 'challans':
-        return <DashboardLayout><CitizenChallans /></DashboardLayout>;
-      case 'lookup':
-        return <DashboardLayout><VehicleLookup /></DashboardLayout>;
-      default:
-        return <DashboardLayout><CitizenDashboard /></DashboardLayout>;
-    }
+    return (
+      <DashboardLayout currentPage={currentPage} onPageChange={handlePageChange}>
+        {renderPageContent()}
+      </DashboardLayout>
+    );
   };
   
   return <div>{renderPage()}</div>;

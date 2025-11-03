@@ -91,19 +91,19 @@ Yatayat/
 ## 🔐 Demo Credentials
 
 ### Citizen Account
-- **Username**: `john_citizen`
+- **Email**: `john@citizen.com`
 - **Password**: `demo123`
 - **Role**: Citizen
 - **Vehicles**: MH12AB1234, MH14CD5678
 
 ### Police Officer Account
-- **Username**: `officer_raj`
+- **Email**: `officer@police.gov.in`
 - **Password**: `demo123`
 - **Role**: Police
 - **Officer ID**: POL001
 
 ### Admin Account
-- **Username**: `admin_system`
+- **Email**: `admin@yatayat.gov.in`
 - **Password**: `demo123`
 - **Role**: Admin
 
