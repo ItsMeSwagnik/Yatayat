@@ -1,20 +1,16 @@
 {
   "functions": {
-    "pages/api/login.js": {
+    "api/login.js": {
       "maxDuration": 10
     },
-    "pages/api/register.js": {
+    "api/register.js": {
       "maxDuration": 10
     },
-    "pages/api/users.js": {
+    "api/users.js": {
       "maxDuration": 10
     }
   },
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/pages/api/$1"
-    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
