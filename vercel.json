@@ -1,18 +1,18 @@
 {
   "functions": {
     "api/login.js": {
-      "maxDuration": 10
+      "maxDuration": 5
     },
     "api/register.js": {
-      "maxDuration": 10
+      "maxDuration": 5
     },
     "api/users.js": {
-      "maxDuration": 10
+      "maxDuration": 5
     }
   },
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!api).*)",
       "destination": "/index.html"
     }
   ]

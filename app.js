@@ -682,31 +682,44 @@ const LoginPage = ({ onLogin }) => {
   const [vehicleNumbers, setVehicleNumbers] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const isMounted = useRef(true);
   const { login, darkMode, toggleDarkMode } = useAuth();
   const styles = getStyles(darkMode);
   
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!isMounted.current) return;
+    
     console.log('Form submitted:', { isLogin, email, role });
     setError('');
+    setLoading(true);
     
-    if (isLogin) {
-      const result = await login(email, password, role);
-      if (result.success) {
-        console.log('Redirecting to dashboard');
-        onLogin && onLogin();
+    try {
+      if (isLogin) {
+        const result = await login(email, password, role);
+        if (!isMounted.current) return;
+        
+        if (result.success) {
+          console.log('Redirecting to dashboard');
+          onLogin && onLogin();
+        } else {
+          console.log('Setting error message:', result.message);
+          setError(result.message || 'Invalid credentials. Please try again.');
+        }
       } else {
-        console.log('Setting error message:', result.message);
-        setError(result.message || 'Invalid credentials. Please try again.');
-      }
-    } else {
-      if (password !== confirmPassword) {
-        console.log('Password mismatch');
-        setError('Passwords do not match');
-        return;
-      }
-      
-      try {
+        if (password !== confirmPassword) {
+          console.log('Password mismatch');
+          setError('Passwords do not match');
+          return;
+        }
+        
         const response = await fetch(window.location.origin.includes('localhost') ? 'http://localhost:5000/api/register' : '/api/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -720,6 +733,8 @@ const LoginPage = ({ onLogin }) => {
           })
         });
         
+        if (!isMounted.current) return;
+        
         const data = await response.json();
         
         if (response.ok) {
@@ -728,8 +743,18 @@ const LoginPage = ({ onLogin }) => {
         } else {
           setError(data.message);
         }
-      } catch (error) {
-        setError('Registration failed. Please try again.');
+      }
+    } catch (error) {
+      if (isMounted.current) {
+        if (isLogin) {
+          setError('Login failed. Please try again.');
+        } else {
+          setError('Registration failed. Please try again.');
+        }
+      }
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
       }
     }
   };
@@ -925,17 +950,33 @@ const LoginPage = ({ onLogin }) => {
           
           <button
             type="submit"
+            disabled={loading}
             style={{
               ...styles.button,
               width: '100%',
-              background: styles.primary,
+              background: loading ? styles.border : styles.primary,
               color: 'white',
               fontWeight: '600',
               fontSize: '16px',
-              padding: '14px'
+              padding: '14px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
             }}
           >
-            {isLogin ? 'Login' : 'Register'}
+            {loading && (
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid transparent',
+                borderTop: '2px solid white',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}></div>
+            )}
+            {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Register')}
           </button>
           
           {isLogin && (
