@@ -1,15 +1,4 @@
 {
-  "functions": {
-    "api/login.js": {
-      "maxDuration": 5
-    },
-    "api/register.js": {
-      "maxDuration": 5
-    },
-    "api/users.js": {
-      "maxDuration": 5
-    }
-  },
   "rewrites": [
     {
       "source": "/((?!api).*)",
