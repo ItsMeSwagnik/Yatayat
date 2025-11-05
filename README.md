@@ -184,6 +184,7 @@ Yatayat/
 - **User Management**: Create, edit, delete, and manage all user accounts
 - **Police Verification**: Approve police officer registrations
 - **System Configuration**: Modify settings and fine amounts
+- **🔒 Security Restriction**: Admin login only via email/password (Google auth disabled for security)
 
 #### **Police Officer Account**
 - **Registration**: Self-registration with pending status
@@ -199,9 +200,16 @@ Yatayat/
 
 ### Registration Process
 
-1. **Citizens**: Register → Immediate active status → Can login
-2. **Police Officers**: Register → Pending status → Admin verification required → Can login
-3. **Admins**: Created by existing admins through user management
+1. **Citizens**: Register → Immediate active status → Can login (Email/Password or Google)
+2. **Police Officers**: Register → Pending status → Admin verification required → Can login (Email/Password or Google)
+3. **Admins**: Created by existing admins through user management → **Email/Password login only**
+
+### Google Authentication Security
+
+- **Citizens & Police**: Full Google authentication support with profile sync
+- **Administrators**: Google authentication **disabled for security** - must use email/password
+- **Account Linking**: Existing accounts can be linked to Google (except admin accounts)
+- **Role Restrictions**: Admin role cannot be selected during Google sign-up
 
 ### Security Features
 
@@ -210,6 +218,8 @@ Yatayat/
 - **Status Checks**: Account status validation on login
 - **Session Management**: Token-based authentication
 - **Input Sanitization**: XSS and injection prevention
+- **Google Auth Security**: Admin login restricted to email/password only
+- **Multi-level Authentication**: Separate auth flows for different user roles
 
 ## 🎯 Key Functionalities
 

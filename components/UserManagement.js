@@ -162,6 +162,7 @@ const UserManagement = () => {
                 <th style={styles.th}>Name</th>
                 <th style={styles.th}>Email</th>
                 <th style={styles.th}>Role</th>
+                <th style={styles.th}>Vehicles</th>
                 <th style={styles.th}>Status</th>
                 <th style={styles.th}>Created</th>
                 <th style={styles.th}>Actions</th>
@@ -173,6 +174,7 @@ const UserManagement = () => {
                   <td style={styles.td}>{user.fullName}</td>
                   <td style={styles.td}>{user.email}</td>
                   <td style={styles.td}><span style={{ textTransform: 'capitalize', padding: '4px 8px', background: styles.light, borderRadius: '4px' }}>{user.role}</span></td>
+                  <td style={styles.td}>{(user.vehicleNumbers || []).join(', ') || 'None'}</td>
                   <td style={styles.td}><StatusBadge status={user.status} /></td>
                   <td style={styles.td}>{new Date(user.createdAt).toLocaleDateString()}</td>
                   <td style={styles.td}>

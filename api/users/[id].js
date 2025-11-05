@@ -28,7 +28,16 @@ export default async function handler(req, res) {
     if (req.method === 'PUT') {
       const updateData = req.body;
       
-      // Remove any fields that shouldn't be updated
+      // Handle status-only updates (from /status endpoint)
+      if (updateData.status && Object.keys(updateData).length === 1) {
+        await db.collection('users').updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status: updateData.status } }
+        );
+        return res.status(200).json({ message: 'User status updated successfully' });
+      }
+      
+      // Handle full user updates
       delete updateData._id;
       delete updateData.createdAt;
       

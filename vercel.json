@@ -1,6 +1,22 @@
 {
   "rewrites": [
     {
+      "source": "/api/vehicles",
+      "destination": "/api/consolidated?endpoint=vehicles"
+    },
+    {
+      "source": "/api/google-auth",
+      "destination": "/api/consolidated?endpoint=google-auth"
+    },
+    {
+      "source": "/api/google-users",
+      "destination": "/api/consolidated?endpoint=google-users"
+    },
+    {
+      "source": "/api/google-vehicles",
+      "destination": "/api/consolidated?endpoint=google-vehicles"
+    },
+    {
       "source": "/((?!api).*)",
       "destination": "/index.html"
     }

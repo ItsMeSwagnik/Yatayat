@@ -1,5 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import { ObjectId } from 'mongodb';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -30,11 +31,14 @@ mongoose.connect(process.env.MONGODB_URI)
 // User Schema
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  password: { type: String, required: function() { return !this.googleId; } },
   role: { type: String, enum: ['citizen', 'police', 'admin'], required: true },
   fullName: { type: String, required: true },
   vehicleNumbers: [String],
   officerId: String,
+  googleId: String,
+  profilePicture: String,
+  authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
   status: { type: String, default: function() { return this.role === 'police' ? 'Pending' : 'Active'; } },
   createdAt: { type: Date, default: Date.now }
 });
@@ -98,6 +102,68 @@ app.post('/api/register', async (req, res) => {
       stack: error.stack,
       name: error.name
     });
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Google authentication route
+app.post('/api/google-auth', async (req, res) => {
+  try {
+    const { credential, role } = req.body;
+    
+    // Decode Firebase ID token (basic decode for demo - in production use Firebase Admin SDK)
+    const payload = jwt.decode(credential);
+    if (!payload) {
+      return res.status(400).json({ message: 'Invalid Firebase token' });
+    }
+
+    const { email, name, picture } = payload;
+    
+    // Check if user exists
+    let user = await User.findOne({ email, role });
+    
+    if (!user) {
+      // Create new user
+      const userData = {
+        email,
+        fullName: name,
+        role,
+        googleId: payload.sub,
+        profilePicture: picture,
+        status: role === 'police' ? 'Pending' : 'Active',
+        createdAt: new Date(),
+        authProvider: 'google'
+      };
+      
+      user = new User(userData);
+      await user.save();
+    }
+    
+    // Check if police account is verified
+    if (user.role === 'police' && user.status === 'Pending') {
+      return res.status(400).json({ message: 'Your police account is pending admin verification. Please contact admin.' });
+    }
+    
+    // Create JWT token
+    const token = jwt.sign(
+      { userId: user._id.toString(), email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    res.json({
+      token,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        role: user.role,
+        fullName: user.fullName,
+        profilePicture: user.profilePicture,
+        status: user.status
+      }
+    });
+  } catch (error) {
+    console.error('Google auth error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -181,6 +247,60 @@ app.delete('/api/users/:id', async (req, res) => {
     }
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Consolidated endpoint for vehicles
+app.all('/api/consolidated', async (req, res) => {
+  try {
+    const { endpoint } = req.query;
+    
+    if (endpoint === 'vehicles') {
+      if (req.method === 'GET') {
+        const { userId } = req.query;
+        if (!userId) {
+          return res.status(400).json({ message: 'User ID is required' });
+        }
+        
+        const user = await User.findById(userId);
+        if (!user) {
+          return res.status(404).json({ message: 'User not found' });
+        }
+        
+        return res.json({ vehicles: user.vehicleNumbers || [] });
+      }
+      
+      if (req.method === 'POST') {
+        const { userId, vehicleNumber } = req.body;
+        if (!userId || !vehicleNumber) {
+          return res.status(400).json({ message: 'User ID and vehicle number are required' });
+        }
+        
+        await User.findByIdAndUpdate(userId, {
+          $addToSet: { vehicleNumbers: vehicleNumber.toUpperCase() }
+        });
+        
+        return res.json({ message: 'Vehicle added successfully' });
+      }
+      
+      if (req.method === 'DELETE') {
+        const { userId, vehicleNumber } = req.body;
+        if (!userId || !vehicleNumber) {
+          return res.status(400).json({ message: 'User ID and vehicle number are required' });
+        }
+        
+        await User.findByIdAndUpdate(userId, {
+          $pull: { vehicleNumbers: vehicleNumber }
+        });
+        
+        return res.json({ message: 'Vehicle removed successfully' });
+      }
+    }
+    
+    return res.status(404).json({ message: 'Endpoint not found' });
+  } catch (error) {
+    console.error('Consolidated API error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
