@@ -738,12 +738,22 @@ const GoogleSignInButton = ({ role }) => {
       // Get ID token
       const idToken = await user.getIdToken();
       
-      const loginResult = await googleLogin(idToken, role);
-      if (loginResult.success) {
+      const response = await fetch('/api/google-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: idToken, role })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
         window.location.reload();
       } else {
-        alert(loginResult.message || 'Google login failed');
+        alert(data.message || 'Google login failed');
       }
+
     } catch (error) {
       console.error('Google login error:', error);
       alert('Google login failed. Please try again.');

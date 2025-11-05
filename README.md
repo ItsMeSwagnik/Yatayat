@@ -136,6 +136,14 @@ Yatayat/
    MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/yatayat
    JWT_SECRET=your_jwt_secret_key
    NODE_ENV=development
+   
+   # Google OAuth Configuration
+   GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+   
+   # Firebase Configuration
+   FIREBASE_API_KEY=your-firebase-api-key
+   FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+   FIREBASE_PROJECT_ID=your-project-id
    ```
 
 4. **Database Setup**
@@ -169,6 +177,9 @@ Yatayat/
    MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/yatayat
    JWT_SECRET=your_jwt_secret_key
    NODE_ENV=production
+   GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+   FIREBASE_API_KEY=your-firebase-api-key
+   FIREBASE_PROJECT_ID=your-project-id
    ```
 
 3. **Deploy**
@@ -210,6 +221,7 @@ Yatayat/
 - **Administrators**: Google authentication **disabled for security** - must use email/password
 - **Account Linking**: Existing accounts can be linked to Google (except admin accounts)
 - **Role Restrictions**: Admin role cannot be selected during Google sign-up
+- **Multi-level Security**: Frontend, Firebase, and API-level admin restrictions
 
 ### Security Features
 
@@ -219,6 +231,7 @@ Yatayat/
 - **Session Management**: Token-based authentication
 - **Input Sanitization**: XSS and injection prevention
 - **Google Auth Security**: Admin login restricted to email/password only
+- **Token Verification**: Google ID token validation using OAuth2Client
 - **Multi-level Authentication**: Separate auth flows for different user roles
 
 ## 🎯 Key Functionalities

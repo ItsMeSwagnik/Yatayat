@@ -1,12 +1,23 @@
 {
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "unsafe-none"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/vehicles",
       "destination": "/api/consolidated?endpoint=vehicles"
-    },
-    {
-      "source": "/api/google-auth",
-      "destination": "/api/consolidated?endpoint=google-auth"
     },
     {
       "source": "/api/google-users",
